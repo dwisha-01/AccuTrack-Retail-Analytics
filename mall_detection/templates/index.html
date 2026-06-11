@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AcuTrack — Retail Analytics</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f0f2f5;
+      color: #2d3748;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 38px; height: 38px;
+      background: #3b82f6;
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px;
+    }
+    .logo-name { font-size: 17px; font-weight: 700; color: #1a202c; }
+    .logo-tag  { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .live-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: #f0fdf4; border: 1px solid #bbf7d0;
+      padding: 5px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 500; color: #15803d;
+    }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #22c55e; animation: pulse 1.4s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+    @keyframes alertPulse {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(239,68,68,0.3); }
+      50%       { box-shadow: 0 0 0 5px rgba(239,68,68,0.08); }
+    }
+    .clock { font-size: 12px; color: #94a3b8; }
+    .page { max-width: 1320px; margin: 0 auto; padding: 24px 28px; }
+
+    /* CAMERA SELECTOR */
+    .selector-section {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin-bottom: 20px;
+    }
+    .selector-title {
+      font-size: 12px; font-weight: 600; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+    .video-buttons { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .vid-btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: 1.5px solid #e2e8f0;
+      background: #f8fafc;
+      cursor: pointer;
+      font-family: 'Poppins', sans-serif;
+      font-size: 13px; font-weight: 600;
+      color: #64748b;
+      transition: all 0.2s;
+      text-align: left;
+    }
+    .vid-btn:hover { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
+    .vid-btn.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+    .vid-btn .btn-desc {
+      font-size: 10px; opacity: 0.75;
+      display: block; margin-top: 2px; font-weight: 400;
+    }
+    .vid-btn.active .btn-desc { opacity: 0.85; }
+    .vid-btn.live-btn { border-color: #ef4444; color: #ef4444; background: #fff5f5; }
+    .vid-btn.live-btn:hover { background: #fee2e2; border-color: #dc2626; }
+    .vid-btn.live-btn.active { background: #ef4444; border-color: #ef4444; color: #fff; }
+    .live-cam-dot {
+      display: inline-block;
+      width: 7px; height: 7px; border-radius: 50%;
+      background: currentColor;
+      margin-right: 5px;
+      animation: pulse 1.4s infinite;
+    }
+    .divider { width: 1px; height: 40px; background: #e2e8f0; margin: 0 4px; }
+    .flow-btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: 1.5px solid #e2e8f0;
+      background: #f8fafc;
+      cursor: pointer;
+      font-family: 'Poppins', sans-serif;
+      font-size: 13px; font-weight: 500;
+      color: #64748b;
+      transition: all 0.2s;
+    }
+    .flow-btn.on { background: #eff6ff; border-color: #3b82f6; color: #2563eb; }
+
+    /* STAT CARDS */
+    .stats-row {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 14px; margin-bottom: 20px;
+    }
+    .stat-card {
+      background: #fff; border: 1px solid #e2e8f0;
+      border-radius: 12px; padding: 18px 20px;
+      border-left: 4px solid #3b82f6;
+    }
+    .stat-card.green  { border-left-color: #22c55e; }
+    .stat-card.orange { border-left-color: #f97316; }
+    .stat-card.purple { border-left-color: #a855f7; }
+    .stat-label {
+      font-size: 11px; color: #94a3b8; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;
+    }
+    .stat-value { font-size: 38px; font-weight: 700; color: #1e293b; line-height: 1; }
+    .stat-sub   { font-size: 11px; color: #cbd5e1; margin-top: 5px; }
+
+    /* MAIN GRID */
+    .main-grid { display: grid; grid-template-columns: 1fr 340px; gap: 18px; }
+    .video-card {
+      background: #fff; border: 1px solid #e2e8f0;
+      border-radius: 12px; overflow: hidden;
+    }
+    .card-header {
+      padding: 13px 18px; border-bottom: 1px solid #e2e8f0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-title { font-size: 13px; font-weight: 600; color: #1e293b; }
+    .card-meta {
+      font-size: 11px; color: #94a3b8;
+      background: #f1f5f9; padding: 3px 10px; border-radius: 20px;
+    }
+    .video-feed {
+      width: 100%; display: block;
+      min-height: 400px; object-fit: cover; background: #1e293b;
+    }
+    .video-footer {
+      padding: 10px 18px; border-top: 1px solid #f1f5f9;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .now-playing { font-size: 12px; color: #64748b; }
+    .now-playing span { font-weight: 600; color: #3b82f6; }
+
+    /* ZONE PANEL */
+    .zone-panel { display: flex; flex-direction: column; gap: 14px; }
+    .zone-card {
+      background: #fff; border: 1px solid #e2e8f0;
+      border-radius: 12px; padding: 16px 18px;
+      transition: box-shadow 0.3s, border-color 0.3s;
+    }
+    .zone-card.occupied { box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+    .zone-card.alert {
+      border-color: #ef4444;
+      animation: alertPulse 1.2s ease-in-out infinite;
+    }
+    .zone-top {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: 4px;
+    }
+    .zone-name {
+      display: flex; align-items: center; gap: 8px;
+      font-weight: 600; font-size: 13px; color: #1e293b;
+    }
+    .zone-dot { width: 9px; height: 9px; border-radius: 50%; }
+    .zone-sublabel {
+      font-size: 11px; color: #94a3b8; font-weight: 400;
+      margin-left: 17px; margin-bottom: 10px;
+    }
+    .status-pill {
+      font-size: 10px; padding: 3px 9px;
+      border-radius: 20px; font-weight: 600;
+    }
+    .status-occupied { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .status-empty    { background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; }
+    .status-alert    { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .zone-metrics {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 8px; margin-bottom: 12px;
+    }
+    .metric { background: #f8fafc; border-radius: 8px; padding: 9px 6px; text-align: center; }
+    .metric-val { font-size: 20px; font-weight: 700; color: #1e293b; }
+    .metric-lbl {
+      font-size: 9px; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-top: 2px; font-weight: 500;
+    }
+    .bar-row {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: #94a3b8; margin-bottom: 4px;
+    }
+    .bar-track { height: 5px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+    .bar-fill  { height: 100%; border-radius: 3px; transition: width 0.5s ease, background 0.3s; }
+
+    /* ── ACTIVITY HEATMAP GRID ──────────────────────────────────────────────── */
+    .heatmap-panel {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin-top: 18px;
+    }
+    .heatmap-panel-title {
+      font-size: 12px; font-weight: 600; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 14px;
+    }
+    .heatmap-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .heatmap-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .heatmap-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      width: 56px;
+      flex-shrink: 0;
+    }
+    .heatmap-cells {
+      display: flex;
+      gap: 3px;
+      flex: 1;
+    }
+    .heatmap-cell {
+      height: 18px;
+      border-radius: 3px;
+      flex: 1;
+      background: #f1f5f9;
+      transition: background 0.5s ease;
+    }
+    .heatmap-count {
+      font-size: 11px;
+      font-weight: 700;
+      color: #1e293b;
+      width: 32px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 12px;
+      font-size: 10px;
+      color: #94a3b8;
+    }
+    .legend-gradient {
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(to right, #f1f5f9, #bbf7d0, #4ade80, #16a34a, #166534);
+    }
+
+    footer {
+      text-align: center; padding: 18px;
+      font-size: 12px; color: #94a3b8;
+      border-top: 1px solid #e2e8f0;
+      margin-top: 28px; background: #fff;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🏬</div>
+    <div>
+      <div class="logo-name">AcuTrack</div>
+      <div class="logo-tag">ID-Persistent Retail Analytics Platform</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-pill"><div class="live-dot"></div>Live</div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- CAMERA SELECTOR -->
+  <div class="selector-section">
+    <div class="selector-title">Select Camera Feed</div>
+    <div class="video-buttons">
+
+      <button class="vid-btn active" data-video="cam1" onclick="switchVideo('cam1', this)">
+        Camera 1
+        <span class="btn-desc">Mall Dataset — Indoor retail</span>
+      </button>
+
+      <button class="vid-btn" data-video="cam2" onclick="switchVideo('cam2', this)">
+        Camera 2
+        <span class="btn-desc">Normal Crowd — Outdoor walkway</span>
+      </button>
+
+      <button class="vid-btn" data-video="cam3" onclick="switchVideo('cam3', this)">
+        Camera 3
+        <span class="btn-desc">Low Light — Poor visibility</span>
+      </button>
+
+      <button class="vid-btn live-btn" data-video="live" onclick="switchVideo('live', this)">
+        <span class="live-cam-dot"></span>Live Camera
+        <span class="btn-desc">Webcam — Real-time input</span>
+      </button>
+
+      <div class="divider"></div>
+
+      <button class="flow-btn" id="flow-btn" onclick="toggleFlow()">
+        ➡ Flow: OFF
+      </button>
+
+    </div>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">People in Frame</div>
+      <div class="stat-value" id="total-count">0</div>
+      <div class="stat-sub">detected right now</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">Zone A · Footfall</div>
+      <div class="stat-value" id="fa-footfall">0</div>
+      <div class="stat-sub">total entries</div>
+    </div>
+    <div class="stat-card orange">
+      <div class="stat-label">Zone B · Footfall</div>
+      <div class="stat-value" id="fb-footfall">0</div>
+      <div class="stat-sub">total entries</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-label">Zone C · Footfall</div>
+      <div class="stat-value" id="fc-footfall">0</div>
+      <div class="stat-sub">total entries</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <div class="video-card">
+      <div class="card-header">
+        <div class="card-title">Live Detection Feed</div>
+        <div class="card-meta" id="cam-label">Camera 1</div>
+      </div>
+      <img class="video-feed" src="/video_feed" alt="Live Feed"/>
+      <div class="video-footer">
+        <div class="now-playing">Now playing: <span id="now-playing-label">Camera 1</span></div>
+        <div class="now-playing">YOLOv8 + StrongSort + OSNet</div>
+      </div>
+    </div>
+
+    <div class="zone-panel">
+
+      <!-- ZONE A -->
+      <div class="zone-card" id="card-a">
+        <div class="zone-top">
+          <div class="zone-name">
+            <div class="zone-dot" style="background:#3b82f6"></div>
+            Zone A
+          </div>
+          <div class="status-pill status-empty" id="status-a">Empty</div>
+        </div>
+        <div class="zone-sublabel">Store Entrance</div>
+        <div class="zone-metrics">
+          <div class="metric"><div class="metric-val" id="a-count">0</div><div class="metric-lbl">Now</div></div>
+          <div class="metric"><div class="metric-val" id="a-footfall">0</div><div class="metric-lbl">Footfall</div></div>
+          <div class="metric"><div class="metric-val" id="a-dwell">0s</div><div class="metric-lbl">Avg Dwell</div></div>
+        </div>
+        <div class="bar-row"><span>Occupancy</span><span id="a-pct">0%</span></div>
+        <div class="bar-track"><div class="bar-fill" id="a-bar" style="width:0%;background:#3b82f6"></div></div>
+      </div>
+
+      <!-- ZONE B -->
+      <div class="zone-card" id="card-b">
+        <div class="zone-top">
+          <div class="zone-name">
+            <div class="zone-dot" style="background:#22c55e"></div>
+            Zone B
+          </div>
+          <div class="status-pill status-empty" id="status-b">Empty</div>
+        </div>
+        <div class="zone-sublabel">Food Court</div>
+        <div class="zone-metrics">
+          <div class="metric"><div class="metric-val" id="b-count">0</div><div class="metric-lbl">Now</div></div>
+          <div class="metric"><div class="metric-val" id="b-footfall">0</div><div class="metric-lbl">Footfall</div></div>
+          <div class="metric"><div class="metric-val" id="b-dwell">0s</div><div class="metric-lbl">Avg Dwell</div></div>
+        </div>
+        <div class="bar-row"><span>Occupancy</span><span id="b-pct">0%</span></div>
+        <div class="bar-track"><div class="bar-fill" id="b-bar" style="width:0%;background:#22c55e"></div></div>
+      </div>
+
+      <!-- ZONE C -->
+      <div class="zone-card" id="card-c">
+        <div class="zone-top">
+          <div class="zone-name">
+            <div class="zone-dot" style="background:#f97316"></div>
+            Zone C
+          </div>
+          <div class="status-pill status-empty" id="status-c">Empty</div>
+        </div>
+        <div class="zone-sublabel">Exit Corridor</div>
+        <div class="zone-metrics">
+          <div class="metric"><div class="metric-val" id="c-count">0</div><div class="metric-lbl">Now</div></div>
+          <div class="metric"><div class="metric-val" id="c-footfall">0</div><div class="metric-lbl">Footfall</div></div>
+          <div class="metric"><div class="metric-val" id="c-dwell">0s</div><div class="metric-lbl">Avg Dwell</div></div>
+        </div>
+        <div class="bar-row"><span>Occupancy</span><span id="c-pct">0%</span></div>
+        <div class="bar-track"><div class="bar-fill" id="c-bar" style="width:0%;background:#f97316"></div></div>
+      </div>
+
+      <!-- ACTIVITY HEATMAP GRID -->
+      <div class="heatmap-panel">
+        <div class="heatmap-panel-title">Zone Activity Heatmap</div>
+        <div class="heatmap-grid">
+
+          <div class="heatmap-row">
+            <div class="heatmap-label">Zone A</div>
+            <div class="heatmap-cells" id="hm-cells-a"></div>
+            <div class="heatmap-count" id="hm-count-a">0</div>
+          </div>
+
+          <div class="heatmap-row">
+            <div class="heatmap-label">Zone B</div>
+            <div class="heatmap-cells" id="hm-cells-b"></div>
+            <div class="heatmap-count" id="hm-count-b">0</div>
+          </div>
+
+          <div class="heatmap-row">
+            <div class="heatmap-label">Zone C</div>
+            <div class="heatmap-cells" id="hm-cells-c"></div>
+            <div class="heatmap-count" id="hm-count-c">0</div>
+          </div>
+
+        </div>
+        <div class="heatmap-legend">
+          <span>Low</span>
+          <div class="legend-gradient"></div>
+          <span>High</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<footer>AcuTrack — An ID-Persistent Retail Analytics Platform</footer>
+
+<script>
+  setInterval(() => {
+    document.getElementById('clock').textContent = new Date().toTimeString().slice(0, 8);
+  }, 1000);
+
+  const socket = io();
+
+  const CAM_LABELS = {
+    cam1: "Camera 1",
+    cam2: "Camera 2",
+    cam3: "Camera 3",
+    live: "Live Camera"
+  };
+
+  const ZONE_COLORS = {
+    a: { normal: '#3b82f6', alert: '#ef4444' },
+    b: { normal: '#22c55e', alert: '#ef4444' },
+    c: { normal: '#f97316', alert: '#ef4444' },
+  };
+
+  // ── ACTIVITY HEATMAP GRID ────────────────────────────────────────────────────
+  const HISTORY_LEN = 20;
+  const zoneHistory = { a: [], b: [], c: [] };
+
+  ['a', 'b', 'c'].forEach(p => {
+    const container = document.getElementById(`hm-cells-${p}`);
+    for (let i = 0; i < HISTORY_LEN; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-cell';
+      cell.id = `hm-cell-${p}-${i}`;
+      container.appendChild(cell);
+    }
+  });
+
+  function getHeatColor(intensity) {
+    if (intensity <= 0)   return '#f1f5f9';
+    if (intensity < 0.2)  return '#dcfce7';
+    if (intensity < 0.4)  return '#86efac';
+    if (intensity < 0.6)  return '#4ade80';
+    if (intensity < 0.8)  return '#16a34a';
+    return '#166534';
+  }
+
+  function updateHeatmap(p, footfall) {
+    const history = zoneHistory[p];
+    history.push(footfall);
+    if (history.length > HISTORY_LEN) history.shift();
+    const max = Math.max(...history, 1);
+    for (let i = 0; i < HISTORY_LEN; i++) {
+      const cell = document.getElementById(`hm-cell-${p}-${i}`);
+      if (!cell) continue;
+      const val = history[i] !== undefined ? history[i] : 0;
+      cell.style.background = getHeatColor(val / max);
+      cell.title = `Footfall: ${val}`;
+    }
+    document.getElementById(`hm-count-${p}`).textContent = footfall;
+  }
+
+  // ── VIDEO SWITCH ─────────────────────────────────────────────────────────────
+  function switchVideo(key, btn) {
+    document.querySelectorAll('.vid-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const label = CAM_LABELS[key] || key;
+    document.getElementById('cam-label').textContent = label;
+    document.getElementById('now-playing-label').textContent = label;
+    fetch('/switch_video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ video: key })
+    });
+    ['total-count','fa-footfall','fb-footfall','fc-footfall',
+     'a-count','a-footfall','b-count','b-footfall','c-count','c-footfall']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; });
+    ['a-dwell','b-dwell','c-dwell'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.textContent = '0s';
+    });
+    ['a-bar','b-bar','c-bar'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.width = '0%';
+    });
+    ['a','b','c'].forEach(p => {
+      document.getElementById(`card-${p}`).classList.remove('alert','occupied');
+      document.getElementById(`status-${p}`).className = 'status-pill status-empty';
+      document.getElementById(`status-${p}`).textContent = 'Empty';
+      zoneHistory[p] = [];
+      updateHeatmap(p, 0);
+    });
+  }
+
+  // ── FLOW TOGGLE ──────────────────────────────────────────────────────────────
+  let flowOn = false;
+  function toggleFlow() {
+    fetch('/toggle_flow', { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        flowOn = data.flow;
+        const btn = document.getElementById('flow-btn');
+        btn.textContent = flowOn ? '➡ Flow: ON' : '➡ Flow: OFF';
+        btn.className = flowOn ? 'flow-btn on' : 'flow-btn';
+      });
+  }
+
+  // ── STATS UPDATE ─────────────────────────────────────────────────────────────
+  socket.on('stats', function(data) {
+    document.getElementById('total-count').textContent = data.total;
+
+    const map = {
+      "Zone A": { p: "a", top: "fa-footfall" },
+      "Zone B": { p: "b", top: "fb-footfall" },
+      "Zone C": { p: "c", top: "fc-footfall" },
+    };
+
+    for (const [zone, ids] of Object.entries(map)) {
+      const z = data.zones[zone];
+      if (!z) continue;
+      const p = ids.p;
+
+      document.getElementById(`${p}-count`).textContent    = z.count;
+      document.getElementById(`${p}-footfall`).textContent = z.footfall;
+      document.getElementById(`${p}-dwell`).textContent    = z.dwell + 's';
+      document.getElementById(ids.top).textContent         = z.footfall;
+
+      const capacity = z.capacity || 10;
+      const pct = Math.min(100, Math.round((z.count / capacity) * 100));
+      const barEl = document.getElementById(`${p}-bar`);
+      barEl.style.width = pct + '%';
+      document.getElementById(`${p}-pct`).textContent = pct + '%';
+
+      const statusEl = document.getElementById(`status-${p}`);
+      const cardEl   = document.getElementById(`card-${p}`);
+
+      if (z.alert) {
+        cardEl.classList.add('alert');
+        cardEl.classList.remove('occupied');
+        statusEl.textContent = '! Overcrowded';
+        statusEl.className   = 'status-pill status-alert';
+        barEl.style.background = ZONE_COLORS[p].alert;
+      } else if (z.count > 0) {
+        cardEl.classList.remove('alert');
+        cardEl.classList.add('occupied');
+        statusEl.textContent = 'Occupied';
+        statusEl.className   = 'status-pill status-occupied';
+        barEl.style.background = ZONE_COLORS[p].normal;
+      } else {
+        cardEl.classList.remove('alert', 'occupied');
+        statusEl.textContent = 'Empty';
+        statusEl.className   = 'status-pill status-empty';
+        barEl.style.background = ZONE_COLORS[p].normal;
+      }
+
+      updateHeatmap(p, z.footfall);
+    }
+  });
+</script>
+
+</body>
+</html>

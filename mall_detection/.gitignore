@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+
+# Models
+*.pt
+*.pth
+
+# Videos
+*.mp4
+*.avi
+*.mov
+
+# Datasets
+UCSD_Anomaly_Dataset.v1p2/
+
+# Environment Variables
+.env
+
+# VS Code
+.vscode/
