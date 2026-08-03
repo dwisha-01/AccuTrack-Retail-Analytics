@@ -22,3 +22,6 @@ UCSD_Anomaly_Dataset.v1p2/
 
 # VS Code
 .vscode/
+
+# Databases
+*.db
